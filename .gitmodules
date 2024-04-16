@@ -1,0 +1,3 @@
+[submodule "Menagerie"]
+	path = Menagerie
+	url = git@github.com:m-messer/Menagerie.git
