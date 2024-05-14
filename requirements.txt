@@ -1,3 +1,6 @@
 pandas
 seaborn
 statsmodels
+nltk
+gensim
+scipy==1.12
