@@ -1,6 +1,16 @@
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 
+
+def calculate_sentence_sim(row):
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+    embedding_1 = model.encode(row['feedback_1'], convert_to_tensor=True)
+    embedding_2 = model.encode(row['feedback_2'], convert_to_tensor=True)
+
+    return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
+
+
 class SimilarityAnalysis:
     DUPLICATE_MAP = {
         680: 144,
@@ -21,18 +31,9 @@ class SimilarityAnalysis:
         print("Formating table for intra_rater")
         self.process_intra_rater()
         print("Calculating intra-rater similarity...")
-        self.data['sim'] = self.data.apply(self.calculate_sentence_sim, axis=1)
+        self.data['sim'] = self.data.apply(calculate_sentence_sim, axis=1)
         print("Saving....")
         self.save_data()
-
-    def calculate_sentence_sim(self, row):
-        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-
-        embedding_1 = model.encode(row['feedback_1'], convert_to_tensor=True)
-        embedding_2 = model.encode(row['feedback_2'], convert_to_tensor=True)
-
-        return util.pytorch_cos_sim(embedding_1, embedding_2).numpy()[0]
-
 
     def process_intra_rater(self):
         intra_rater_df = self.data[self.data['assignment_number'].isin(

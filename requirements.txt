@@ -4,3 +4,5 @@ statsmodels
 nltk
 gensim
 scipy==1.12
+scikit-learn
+sentence-transformers
