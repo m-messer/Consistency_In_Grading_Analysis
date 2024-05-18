@@ -3,21 +3,19 @@ from sentence_transformers import SentenceTransformer, util
 from itertools import combinations
 
 
-def calculate_sentence_sim(row):
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-
-    embedding_1 = model.encode(row['feedback_1'], convert_to_tensor=True)
-    embedding_2 = model.encode(row['feedback_2'], convert_to_tensor=True)
-
-    return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
-
-
 class SimilarityAnalysis:
     def __init__(self, data_path):
         self.data = pd.read_csv(data_path)
+        self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
     def preprocess(self):
         self.data = self.data.dropna()
+
+    def calculate_sentence_sim(self, row):
+        embedding_1 = self.model.encode(row['feedback_1'], convert_to_tensor=True)
+        embedding_2 = self.model.encode(row['feedback_2'], convert_to_tensor=True)
+
+        return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
 
     def save_data(self, output_path):
         self.data.to_csv(output_path, index=False)
@@ -25,15 +23,31 @@ class SimilarityAnalysis:
 
 class InterRaterSimilarityAnalysis(SimilarityAnalysis):
 
+    def __init__(self, data_path):
+        super().__init__(data_path)
+        self.output_data = None
+
     def calculate_similarity(self):
         print("Preprocessing data...")
         self.preprocess()
-        print("Formating table for intra_rater")
-        # TODO
+        print("Formating table for inter_rater")
+        # TODO: Add loops for groups and skills
+        self.process_inter_rater()
         print("Calculating pair-wise similarity...")
-        # TODO
+        self.output_data['sim'] = self.data.apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
-        self.save_data('intra_rater_sim.csv')
+        self.save_data('inter_rater_sim.csv')
+        
+    def process_inter_rater(self):
+        group = '1-4',
+        skill = 'Correctness'
+        
+        for n in self.data[(self.data['group'] == '1-4') &
+                           (self.data['skill'] == 'Correctness')]['assignment_number'].unique():
+            if self.output_data is None:
+                self.output_data = self.generate_feedback_pairs(group, skill, n)
+            else:
+                self.output_data = pd.concat([self.output_data, self.generate_feedback_pairs(group, skill, n)])
 
     def generate_feedback_pairs(self, group, skill, assignment_number):
         pairs = combinations(range(int(group[0]), int(group[-1]) + 1), r=2)
@@ -46,13 +60,13 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
                                                   'assignment_number': assignment_number,
                                                   'participant_id_1': pair[0],
                                                   'participant_id_2': pair[1],
-                                                  'comment_1': self.data[(self.data['group'] == group) &
+                                                  'feedback_1': self.data[(self.data['group'] == group) &
                                                                          (self.data['skill'] == skill) &
                                                                          (self.data[
                                                                               'assignment_number'] == assignment_number) &
                                                                          (self.data['participant_id'] == pair[0])]
                                                   ['comments'],
-                                                  'comment_2': self.data[(self.data['group'] == group) &
+                                                  'feedback_2': self.data[(self.data['group'] == group) &
                                                                          (self.data['skill'] == skill) &
                                                                          (self.data[
                                                                               'assignment_number'] == assignment_number) &
@@ -65,12 +79,12 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
                     pd.DataFrame({'group': group, 'assignment_number': assignment_number,
                                   'participant_id_1': pair[0],
                                   'participant_id_2': pair[1],
-                                  'comment_1': self.data[(self.data['group'] == group) &
+                                  'feedback_1': self.data[(self.data['group'] == group) &
                                                          (self.data['skill'] == skill) &
                                                          (self.data['assignment_number'] == assignment_number) &
                                                          (self.data['participant_id'] == pair[0])]
                                   ['comments'],
-                                  'comment_2': self.data[(self.data['group'] == group) &
+                                  'feedback_2': self.data[(self.data['group'] == group) &
                                                          (self.data['skill'] == skill) &
                                                          (self.data['assignment_number'] == assignment_number) &
                                                          (self.data['participant_id'] == pair[1])]
@@ -98,7 +112,7 @@ class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
         print("Formating table for intra_rater")
         self.process_intra_rater()
         print("Calculating intra-rater similarity...")
-        self.data['sim'] = self.data.apply(calculate_sentence_sim, axis=1)
+        self.data['sim'] = self.data.apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
         self.save_data('intra_rater_sim.csv')
 
