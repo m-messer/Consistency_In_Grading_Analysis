@@ -1,6 +1,9 @@
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 from itertools import combinations
+from tqdm import tqdm
+
+tqdm.pandas()
 
 
 class SimilarityAnalysis:
@@ -12,9 +15,8 @@ class SimilarityAnalysis:
         self.data = self.data.dropna()
 
     def calculate_sentence_sim(self, row):
-        print(row)
-        embedding_1 = self.model.encode(row['feedback_1'], convert_to_tensor=True)
-        embedding_2 = self.model.encode(row['feedback_2'], convert_to_tensor=True)
+        embedding_1 = self.model.encode(row['feedback_1'], convert_to_tensor=True).cpu()
+        embedding_2 = self.model.encode(row['feedback_2'], convert_to_tensor=True).cpu()
 
         return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
 
@@ -31,8 +33,8 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         print("Formating table for inter_rater")
         # TODO: Add loops for groups and skills
         self.process_inter_rater()
-        # print("Calculating pair-wise similarity...")
-        # self.output_data = self.output_data.apply(self.calculate_sentence_sim, axis=1)
+        print("Calculating pair-wise similarity...")
+        self.output_data['sim'] = self.output_data.progress_apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
 
         self.output_data.to_csv('data/inter_rater_sim.csv')
@@ -48,6 +50,8 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
             else:
                 self.output_data = pd.concat([self.output_data, self.generate_feedback_pairs(group, skill, n)])
 
+        self.output_data = self.output_data.dropna()
+
     def generate_feedback_pairs(self, group, skill, assignment_number):
         pairs = combinations(range(int(group[0]), int(group[-1]) + 1), r=2)
 
@@ -56,8 +60,6 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         for idx, pair in enumerate(pairs):
             feedback_1 = self.get_comments(group, skill, assignment_number, pair[0])
             feedback_2 = self.get_comments(group, skill,assignment_number, pair[1])
-
-            print(feedback_1, feedback_2)
 
             if feedback_pairs_df is None:
                 feedback_pairs_df = pd.DataFrame({'group': group,
