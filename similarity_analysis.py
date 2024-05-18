@@ -12,13 +12,11 @@ class SimilarityAnalysis:
         self.data = self.data.dropna()
 
     def calculate_sentence_sim(self, row):
+        print(row)
         embedding_1 = self.model.encode(row['feedback_1'], convert_to_tensor=True)
         embedding_2 = self.model.encode(row['feedback_2'], convert_to_tensor=True)
 
         return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
-
-    def save_data(self, output_path):
-        self.data.to_csv(output_path, index=False)
 
 
 class InterRaterSimilarityAnalysis(SimilarityAnalysis):
@@ -33,13 +31,14 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         print("Formating table for inter_rater")
         # TODO: Add loops for groups and skills
         self.process_inter_rater()
-        print("Calculating pair-wise similarity...")
-        self.output_data['sim'] = self.data.apply(self.calculate_sentence_sim, axis=1)
+        # print("Calculating pair-wise similarity...")
+        # self.output_data = self.output_data.apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
-        self.save_data('inter_rater_sim.csv')
+
+        self.output_data.to_csv('data/inter_rater_sim.csv')
         
     def process_inter_rater(self):
-        group = '1-4',
+        group = '1-4'
         skill = 'Correctness'
         
         for n in self.data[(self.data['group'] == '1-4') &
@@ -55,45 +54,42 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         feedback_pairs_df = None
 
         for idx, pair in enumerate(pairs):
+            feedback_1 = self.get_comments(group, skill, assignment_number, pair[0])
+            feedback_2 = self.get_comments(group, skill,assignment_number, pair[1])
+
+            print(feedback_1, feedback_2)
+
             if feedback_pairs_df is None:
                 feedback_pairs_df = pd.DataFrame({'group': group,
+                                                  'skill': skill,
                                                   'assignment_number': assignment_number,
                                                   'participant_id_1': pair[0],
                                                   'participant_id_2': pair[1],
-                                                  'feedback_1': self.data[(self.data['group'] == group) &
-                                                                         (self.data['skill'] == skill) &
-                                                                         (self.data[
-                                                                              'assignment_number'] == assignment_number) &
-                                                                         (self.data['participant_id'] == pair[0])]
-                                                  ['comments'],
-                                                  'feedback_2': self.data[(self.data['group'] == group) &
-                                                                         (self.data['skill'] == skill) &
-                                                                         (self.data[
-                                                                              'assignment_number'] == assignment_number) &
-                                                                         (self.data['participant_id'] == pair[1])]
-                                                  ['comments']
+                                                  'feedback_1': feedback_1,
+                                                  'feedback_2': feedback_2
                                                   }, index=[idx])
             else:
                 feedback_pairs_df = pd.concat([
                     feedback_pairs_df,
-                    pd.DataFrame({'group': group, 'assignment_number': assignment_number,
+                    pd.DataFrame({'group': group, 'assignment_number': assignment_number, 'skill': skill,
                                   'participant_id_1': pair[0],
                                   'participant_id_2': pair[1],
-                                  'feedback_1': self.data[(self.data['group'] == group) &
-                                                         (self.data['skill'] == skill) &
-                                                         (self.data['assignment_number'] == assignment_number) &
-                                                         (self.data['participant_id'] == pair[0])]
-                                  ['comments'],
-                                  'feedback_2': self.data[(self.data['group'] == group) &
-                                                         (self.data['skill'] == skill) &
-                                                         (self.data['assignment_number'] == assignment_number) &
-                                                         (self.data['participant_id'] == pair[1])]
-                                  ['comments']
+                                  'feedback_1': feedback_1,
+                                  'feedback_2': feedback_2
                                   }, index=[idx])]
                 )
 
-        return feedback_pairs_df.dropna()
+        return feedback_pairs_df
 
+    def get_comments(self, group, skill, assignment_number, participant_id):
+        feedback = self.data[(self.data['group'] == group) &
+                        (self.data['skill'] == skill) &
+                        (self.data['assignment_number'] == assignment_number) &
+                        (self.data['participant_id'] == participant_id)]['comments']
+
+        if feedback.empty:
+            return None
+        return feedback.reset_index(drop=True)[0]
 
 class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
     DUPLICATE_MAP = {
@@ -112,9 +108,9 @@ class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
         print("Formating table for intra_rater")
         self.process_intra_rater()
         print("Calculating intra-rater similarity...")
-        self.data['sim'] = self.data.apply(self.calculate_sentence_sim, axis=1)
+        self.data = self.data.apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
-        self.save_data('intra_rater_sim.csv')
+        self.data.to_csv('data/intra_rater_sim.csv')
 
     def process_intra_rater(self):
         intra_rater_df = self.data[self.data['assignment_number'].isin(
@@ -135,5 +131,5 @@ class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
 
 if __name__ == '__main__':
     # TODO: Add args
-    sa = InterRaterSimilarityAnalysis('data/intra_rater_data.csv')
+    sa = InterRaterSimilarityAnalysis('data/inter_rater.csv')
     sa.calculate_similarity()
