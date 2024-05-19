@@ -1,4 +1,5 @@
 import pandas as pd
+import argparse
 from sentence_transformers import SentenceTransformer, util
 from itertools import combinations
 from tqdm import tqdm
@@ -6,7 +7,7 @@ from tqdm import tqdm
 tqdm.pandas()
 
 
-class SimilarityAnalysis:
+class SemanticSimilarityAnalysis:
     def __init__(self, data_path):
         self.data = pd.read_csv(data_path)
         self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
@@ -21,7 +22,7 @@ class SimilarityAnalysis:
         return util.pytorch_cos_sim(embedding_1, embedding_2).detach().numpy()[0][0]
 
 
-class InterRaterSimilarityAnalysis(SimilarityAnalysis):
+class InterRaterSemanticSimilarityAnalysis(SemanticSimilarityAnalysis):
 
     def __init__(self, data_path):
         super().__init__(data_path)
@@ -48,7 +49,7 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
                     else:
                         self.output_data = pd.concat([self.output_data, self.generate_feedback_pairs(group, skill, n)])
 
-        print('Removing empty feedback pairs and filling single missing comments...')
+        print('\n Removing empty feedback pairs and filling single missing comments...')
         self.output_data = self.output_data.dropna(how='all')
         self.output_data = self.output_data.fillna('No comment supplied')
 
@@ -95,7 +96,7 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         return feedback.reset_index(drop=True)[0]
 
 
-class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
+class IntraRaterSemanticSimilarityAnalysis(SemanticSimilarityAnalysis):
     DUPLICATE_MAP = {
         680: 144,
         681: 559,
@@ -112,7 +113,7 @@ class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
         print("Formating table for intra_rater")
         self.process_intra_rater()
         print("Calculating intra-rater similarity...")
-        self.data = self.data.apply(self.calculate_sentence_sim, axis=1)
+        self.data = self.data.progress_apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
         self.data.to_csv('data/intra_rater_sim.csv')
 
@@ -134,6 +135,22 @@ class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
 
 
 if __name__ == '__main__':
-    # TODO: Add args
-    sa = InterRaterSimilarityAnalysis('data/inter_rater.csv')
-    sa.calculate_similarity()
+    parser = argparse.ArgumentParser(description='Run Inter/Intra rater sentence semantic similarity analysis')
+    parser.add_argument('-inter', dest='inter', default=False, help='Run in inter-rater analysis',
+                        action='store_true')
+    parser.add_argument('-intra', dest='intra', default=False, help='Run in intra-rater analysis',
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    if args.inter:
+        sa = InterRaterSemanticSimilarityAnalysis('data/inter_rater.csv')
+        sa.calculate_similarity()
+    elif args.intra:
+        sa = IntraRaterSemanticSimilarityAnalysis('data/intra_rater.csv')
+        sa.calculate_similarity()
+    else:
+        print('Please select -inter or -intra to run the semantic similarity analysis')
+
+
+
