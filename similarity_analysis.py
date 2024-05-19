@@ -30,30 +30,31 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
     def calculate_similarity(self):
         print("Preprocessing data...")
         self.preprocess()
-        print("Formating table for inter_rater")
-        # TODO: Add loops for groups and skills
+        print("Formatting table for inter_rater")
         self.process_inter_rater()
         print("Calculating pair-wise similarity...")
         self.output_data['sim'] = self.output_data.progress_apply(self.calculate_sentence_sim, axis=1)
         print("Saving....")
 
-        self.output_data.to_csv('data/inter_rater_sim.csv')
+        self.output_data.to_csv('data/inter_rater_sim.csv', index=False)
         
     def process_inter_rater(self):
-        group = '1-4'
-        skill = 'Correctness'
-        
-        for n in self.data[(self.data['group'] == '1-4') &
-                           (self.data['skill'] == 'Correctness')]['assignment_number'].unique():
-            if self.output_data is None:
-                self.output_data = self.generate_feedback_pairs(group, skill, n)
-            else:
-                self.output_data = pd.concat([self.output_data, self.generate_feedback_pairs(group, skill, n)])
+        for group in tqdm(self.data['group'].unique()):
+            for skill in self.data['skill'].unique():
+                for n in self.data[(self.data['group'] == group) &
+                                   (self.data['skill'] == skill)]['assignment_number'].unique():
+                    if self.output_data is None:
+                        self.output_data = self.generate_feedback_pairs(group, skill, n)
+                    else:
+                        self.output_data = pd.concat([self.output_data, self.generate_feedback_pairs(group, skill, n)])
 
-        self.output_data = self.output_data.dropna()
+        print('Removing empty feedback pairs and filling single missing comments...')
+        self.output_data = self.output_data.dropna(how='all')
+        self.output_data = self.output_data.fillna('No comment supplied')
 
     def generate_feedback_pairs(self, group, skill, assignment_number):
-        pairs = combinations(range(int(group[0]), int(group[-1]) + 1), r=2)
+        group_bounds = group.split('-')
+        pairs = combinations(range(int(group_bounds[0]), int(group_bounds[1]) + 1), r=2)
 
         feedback_pairs_df = None
 
@@ -92,6 +93,7 @@ class InterRaterSimilarityAnalysis(SimilarityAnalysis):
         if feedback.empty:
             return None
         return feedback.reset_index(drop=True)[0]
+
 
 class IntraRaterSimilarityAnalysis(SimilarityAnalysis):
     DUPLICATE_MAP = {
