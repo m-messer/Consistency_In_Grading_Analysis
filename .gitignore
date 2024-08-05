@@ -273,3 +273,4 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,jetbrains+all
+/venv3.10/
