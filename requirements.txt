@@ -8,3 +8,9 @@ scikit-learn
 sentence-transformers
 tqdm~=4.66.4
 krippendorff
+textstat
+spacy
+matplotlib
+numpy
+wordcloud
+pyldavis
