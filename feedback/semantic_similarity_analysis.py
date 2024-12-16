@@ -144,10 +144,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.inter:
-        sa = InterRaterSemanticSimilarityAnalysis('data/inter_rater.csv')
+        sa = InterRaterSemanticSimilarityAnalysis('../data/inter_rater.csv')
         sa.calculate_similarity()
     elif args.intra:
-        sa = IntraRaterSemanticSimilarityAnalysis('data/intra_rater.csv')
+        sa = IntraRaterSemanticSimilarityAnalysis('../data/intra_rater.csv')
         sa.calculate_similarity()
     else:
         print('Please select -inter or -intra to run the semantic similarity analysis')
